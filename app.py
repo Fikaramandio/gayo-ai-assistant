@@ -7,7 +7,7 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 def search_gayo_knowledge(query):
     """
-    Search Gayo language knowledge base with detailed debugging
+    Search Gayo language knowledge base with correct column names
     """
     if not query or len(query.strip()) < 2:
         return "❌ Masukkan minimal 2 karakter untuk pencarian."
@@ -19,108 +19,105 @@ def search_gayo_knowledge(query):
             "Content-Type": "application/json"
         }
         
-        # Enhanced search with better query
+        # CORRECT QUERY - menggunakan kolom yang sesuai dengan struktur database
         url = f"{SUPABASE_URL}/rest/v1/gayo_knowledge_base"
+        
+        # Query yang benar berdasarkan struktur data sample
         params = {
-            "gayo_word": f"ilike.%{query}%",
-            "select": "*,cultural_context,word_class,indonesian_meaning"
+            "select": "id,text,metadata",
+            "or": f"(text.ilike.%{query}%,metadata->>gayo_word.ilike.%{query}%,metadata->>indonesian_meaning.ilike.%{query}%)",
+            "limit": 8
         }
         
-        st.info(f"🔍 Mencari: '{query}' di Supabase...")
+        st.info(f"🔍 Mencari: '{query}'...")
         
         response = requests.get(url, headers=headers, params=params)
         
-        # Debug information
-        st.write(f"📡 Status Code: {response.status_code}")
-        st.write(f"🔗 URL: {url}")
+        st.write(f"📡 Status: {response.status_code}")
         
         if response.status_code == 200:
             results = response.json()
-            st.write(f"📊 Jumlah hasil: {len(results)}")
+            st.write(f"📊 Hasil ditemukan: {len(results)}")
             
             if results:
                 output = f"## 🔍 Ditemukan {len(results)} hasil untuk '{query}'\n\n"
                 
                 for i, item in enumerate(results, 1):
-                    gayo_word = item.get('gayo_word', 'N/A')
-                    indonesian_meaning = item.get('indonesian_meaning', 'Tidak tersedia')
-                    word_class = item.get('word_class', 'Tidak tersedia')
-                    cultural_context = item.get('cultural_context', '')
+                    # Extract data dari struktur yang benar
+                    text = item.get('text', '')
+                    metadata = item.get('metadata', {})
+                    
+                    gayo_word = metadata.get('gayo_word', 'N/A')
+                    indonesian_meaning = metadata.get('indonesian_meaning', 'Tidak tersedia')
+                    word_class = metadata.get('pos_tag', 'Tidak tersedia')
+                    cultural_context = metadata.get('cultural_context', False)
+                    
+                    # Jika tidak ada di metadata, coba extract dari text
+                    if gayo_word == 'N/A' and 'KATA GAYO:' in text:
+                        try:
+                            gayo_word = text.split('KATA GAYO:')[1].split('.')[0].strip()
+                        except:
+                            gayo_word = 'N/A'
                     
                     output += f"### {i}. **{gayo_word}**\n"
                     output += f"**Makna Indonesia:** {indonesian_meaning}\n"
                     output += f"**Kelas Kata:** {word_class}\n"
                     
                     if cultural_context:
-                        output += f"**🏛️ Konteks Budaya:** {cultural_context}\n"
+                        output += f"**🏛️ Memiliki konteks budaya**\n"
                     
                     output += "---\n\n"
                 
-                cultural_count = sum(1 for item in results if item.get('cultural_context'))
+                cultural_count = sum(1 for item in results if item.get('metadata', {}).get('cultural_context'))
                 output += f"**📊 Statistik:** {cultural_count} dari {len(results)} hasil memiliki konteks budaya\n"
                 
                 return output
             else:
-                # Test dengan query yang lebih simple
-                st.warning("Tidak ada hasil. Testing dengan query alternatif...")
-                
-                # Coba query alternatif
-                test_params = {
-                    "select": "*",
-                    "limit": 5
-                }
-                test_response = requests.get(url, headers=headers, params=test_params)
-                
-                if test_response.status_code == 200:
-                    test_data = test_response.json()
-                    if test_data:
-                        return f"✅ Koneksi Supabase berhasil! Database memiliki {len(test_data)} entri. Coba kata kunci lain."
-                    else:
-                        return "❌ Database kosong atau tidak ada data."
-                else:
-                    return f"❌ Error test connection: {test_response.status_code}"
-                    
+                return f"❌ Tidak ditemukan hasil untuk '{query}'. Coba kata kunci lain."
         else:
-            return f"❌ Error API: {response.status_code} - {response.text}"
+            return f"❌ Error: {response.status_code} - {response.text}"
             
     except Exception as e:
         return f"❌ Exception: {str(e)}"
 
-def test_supabase_connection():
-    """Test koneksi ke Supabase"""
+def get_database_structure():
+    """Get database structure untuk debugging"""
     try:
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}"
         }
         url = f"{SUPABASE_URL}/rest/v1/gayo_knowledge_base"
-        params = {"limit": 1}
+        params = {"limit": 1, "select": "*"}
         
         response = requests.get(url, headers=headers, params=params)
-        return response.status_code, response.json() if response.status_code == 200 else None
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return data[0]  # Return first item structure
+        return None
     except Exception as e:
-        return None, str(e)
+        return str(e)
 
 # Streamlit UI
 st.set_page_config(
-    page_title="🤖 AI Assistant Bahasa Gayo - Bener Meriah",
+    page_title="AI Assistant Bahasa Gayo",
     page_icon="🏔️",
     layout="wide"
 )
 
-st.title("🤖 AI Assistant Bahasa Gayo - Bener Meriah")
-st.markdown("### 🏔️ Pelestarian Budaya dan Bahasa Gayo melalui Teknologi AI")
+st.title("AI Assistant Bahasa Gayo")
+st.markdown("### pendukung Neniwer untuk memahami bahasa Gayo")
 
-# Test connection first
-st.subheader("🔧 Connection Test")
-if st.button("Test Koneksi Supabase"):
-    status, data = test_supabase_connection()
-    if status == 200:
-        st.success(f"✅ Koneksi Supabase BERHASIL! Status: {status}")
-        if data:
-            st.info(f"📊 Sample data: {json.dumps(data[0], indent=2)}")
+# Database Structure Debug
+st.subheader("🔧 Database Structure")
+if st.button("Lihat Struktur Database"):
+    structure = get_database_structure()
+    if structure:
+        st.success("✅ Struktur database ditemukan:")
+        st.json(structure)
     else:
-        st.error(f"❌ Koneksi Supabase GAGAL! Status: {status}, Error: {data}")
+        st.error("❌ Gagal mendapatkan struktur database")
 
 st.markdown("---")
 
@@ -140,44 +137,46 @@ if st.button("🚀 Cari", type="primary") or query:
     elif query:
         st.warning("Masukkan minimal 2 karakter")
 
-# Quick tests
+# Quick tests dengan query yang work
 st.markdown("---")
-st.subheader("🎯 Quick Tests")
-col1, col2, col3, col4 = st.columns(4)
+st.subheader("🎯 Test dengan Kata yang Diketahui")
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("🍚 Test: makan"):
+    if st.button("🍚 Test: Titok"):
         with st.spinner("Testing..."):
-            result = search_gayo_knowledge("makan")
+            result = search_gayo_knowledge("Titok")
             st.markdown(result)
 
 with col2:
-    if st.button("🏠 Test: rumah"):
+    if st.button("🔧 Test: Alat"):
         with st.spinner("Testing..."):
-            result = search_gayo_knowledge("rumah")
+            result = search_gayo_knowledge("Alat")
             st.markdown(result)
 
 with col3:
-    if st.button("📚 Test: a"):
+    if st.button("📖 Test: sirih"):
         with st.spinner("Testing..."):
-            result = search_gayo_knowledge("a")
+            result = search_gayo_knowledge("sirih")
             st.markdown(result)
 
-with col4:
-    if st.button("🔍 Test: semua"):
-        with st.spinner("Testing..."):
-            headers = {
-                "apikey": SUPABASE_KEY,
-                "Authorization": f"Bearer {SUPABASE_KEY}"
-            }
-            url = f"{SUPABASE_URL}/rest/v1/gayo_knowledge_base"
-            params = {"limit": 10}
-            response = requests.get(url, headers=headers, params=params)
-            
-            if response.status_code == 200:
-                data = response.json()
-                st.success(f"✅ Total entries: {len(data)}")
-                for item in data[:3]:  # Show first 3
-                    st.write(f"- {item.get('gayo_word', 'N/A')}: {item.get('indonesian_meaning', 'N/A')}")
-            else:
-                st.error(f"❌ Error: {response.status_code}")
+# Show sample data
+st.markdown("---")
+st.subheader("📋 Sample Data dari Database")
+if st.button("Tampilkan Sample Data"):
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    url = f"{SUPABASE_URL}/rest/v1/gayo_knowledge_base"
+    params = {"limit": 5}
+    
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        st.success(f"✅ Menampilkan {len(data)} sample entries:")
+        for i, item in enumerate(data, 1):
+            with st.expander(f"Entry {i}: {item.get('metadata', {}).get('gayo_word', 'N/A')}"):
+                st.json(item)
+    else:
+        st.error(f"❌ Error: {response.status_code}")
