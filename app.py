@@ -124,13 +124,13 @@ def get_total_entries():
 
 # Streamlit UI
 st.set_page_config(
-    page_title="🤖 AI Assistant Bahasa Gayo - Bener Meriah",
+    page_title="AI Assistant Bahasa Gayo",
     page_icon="🏔️",
     layout="wide"
 )
 
-st.title("🤖 AI Assistant Bahasa Gayo - Bener Meriah")
-st.markdown("### 🏔️ Pelestarian Budaya dan Bahasa Gayo melalui Teknologi AI")
+st.title("AI Assistant Bahasa Gayo")
+st.markdown("### pendukung Neniwer untuk memahami bahasa Gayo melalui Teknologi AI")
 
 # Stats
 total_entries = get_total_entries()
