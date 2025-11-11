@@ -7,7 +7,7 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 def search_gayo_knowledge(query):
     """
-    Search Gayo language knowledge base with correct column names
+    Search Gayo language knowledge base - FINAL CORRECT VERSION
     """
     if not query or len(query.strip()) < 2:
         return "❌ Masukkan minimal 2 karakter untuk pencarian."
@@ -19,56 +19,81 @@ def search_gayo_knowledge(query):
             "Content-Type": "application/json"
         }
         
-        # CORRECT QUERY - menggunakan kolom yang sesuai dengan struktur database
+        # CORRECT QUERY - Search in text field (contains all content)
         url = f"{SUPABASE_URL}/rest/v1/gayo_knowledge_base"
         
-        # Query yang benar berdasarkan struktur data sample
+        # Search in the main text field which contains all the content
         params = {
             "select": "id,text,metadata",
-            "or": f"(text.ilike.%{query}%,metadata->>gayo_word.ilike.%{query}%,metadata->>indonesian_meaning.ilike.%{query}%)",
-            "limit": 8
+            "text": f"ilike.%{query}%",
+            "limit": 10
         }
-        
-        st.info(f"🔍 Mencari: '{query}'...")
         
         response = requests.get(url, headers=headers, params=params)
         
-        st.write(f"📡 Status: {response.status_code}")
-        
         if response.status_code == 200:
             results = response.json()
-            st.write(f"📊 Hasil ditemukan: {len(results)}")
             
             if results:
                 output = f"## 🔍 Ditemukan {len(results)} hasil untuk '{query}'\n\n"
                 
                 for i, item in enumerate(results, 1):
-                    # Extract data dari struktur yang benar
                     text = item.get('text', '')
                     metadata = item.get('metadata', {})
                     
+                    # Extract information from text
                     gayo_word = metadata.get('gayo_word', 'N/A')
-                    indonesian_meaning = metadata.get('indonesian_meaning', 'Tidak tersedia')
-                    word_class = metadata.get('pos_tag', 'Tidak tersedia')
+                    indonesian_meaning = metadata.get('indonesian_meaning', '')
                     cultural_context = metadata.get('cultural_context', False)
                     
-                    # Jika tidak ada di metadata, coba extract dari text
+                    # If not in metadata, extract from text
                     if gayo_word == 'N/A' and 'KATA GAYO:' in text:
                         try:
                             gayo_word = text.split('KATA GAYO:')[1].split('.')[0].strip()
                         except:
                             gayo_word = 'N/A'
                     
+                    # Extract Indonesian meaning from text if not in metadata
+                    if not indonesian_meaning and 'Makna Indonesia:' in text:
+                        try:
+                            indonesian_meaning = text.split('Makna Indonesia:')[1].split('. Kelas Kata:')[0].strip()
+                        except:
+                            indonesian_meaning = 'Tidak tersedia'
+                    
+                    # Extract word class
+                    word_class = 'Tidak tersedia'
+                    if 'Kelas Kata:' in text:
+                        try:
+                            word_class = text.split('Kelas Kata:')[1].split('. Konteks Budaya:')[0].strip()
+                        except:
+                            pass
+                    
+                    # Format output
                     output += f"### {i}. **{gayo_word}**\n"
-                    output += f"**Makna Indonesia:** {indonesian_meaning}\n"
-                    output += f"**Kelas Kata:** {word_class}\n"
+                    
+                    if indonesian_meaning:
+                        # Clean up the meaning
+                        clean_meaning = indonesian_meaning.replace('**', '').strip()
+                        if len(clean_meaning) > 150:
+                            clean_meaning = clean_meaning[:147] + "..."
+                        output += f"**Makna Indonesia:** {clean_meaning}\n"
+                    
+                    if word_class != 'Tidak tersedia':
+                        output += f"**Kelas Kata:** {word_class}\n"
                     
                     if cultural_context:
+                        output += f"**🏛️ Memiliki konteks budaya**\n"
+                    elif 'Konteks Budaya: Ya' in text:
                         output += f"**🏛️ Memiliki konteks budaya**\n"
                     
                     output += "---\n\n"
                 
-                cultural_count = sum(1 for item in results if item.get('metadata', {}).get('cultural_context'))
+                # Statistics
+                cultural_count = 0
+                for item in results:
+                    if item.get('metadata', {}).get('cultural_context') or 'Konteks Budaya: Ya' in item.get('text', ''):
+                        cultural_count += 1
+                
                 output += f"**📊 Statistik:** {cultural_count} dari {len(results)} hasil memiliki konteks budaya\n"
                 
                 return output
@@ -80,90 +105,98 @@ def search_gayo_knowledge(query):
     except Exception as e:
         return f"❌ Exception: {str(e)}"
 
-def get_database_structure():
-    """Get database structure untuk debugging"""
+def get_total_entries():
+    """Get total number of entries"""
     try:
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}"
         }
         url = f"{SUPABASE_URL}/rest/v1/gayo_knowledge_base"
-        params = {"limit": 1, "select": "*"}
+        params = {"select": "id", "limit": 1000}
         
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
-            data = response.json()
-            if data:
-                return data[0]  # Return first item structure
-        return None
-    except Exception as e:
-        return str(e)
+            return len(response.json())
+        return 0
+    except:
+        return 0
 
 # Streamlit UI
 st.set_page_config(
-    page_title="AI Assistant Bahasa Gayo",
+    page_title="🤖 AI Assistant Bahasa Gayo - Bener Meriah",
     page_icon="🏔️",
     layout="wide"
 )
 
-st.title("AI Assistant Bahasa Gayo")
-st.markdown("### pendukung Neniwer untuk memahami bahasa Gayo")
+st.title("🤖 AI Assistant Bahasa Gayo - Bener Meriah")
+st.markdown("### 🏔️ Pelestarian Budaya dan Bahasa Gayo melalui Teknologi AI")
 
-# Database Structure Debug
-st.subheader("🔧 Database Structure")
-if st.button("Lihat Struktur Database"):
-    structure = get_database_structure()
-    if structure:
-        st.success("✅ Struktur database ditemukan:")
-        st.json(structure)
-    else:
-        st.error("❌ Gagal mendapatkan struktur database")
-
-st.markdown("---")
+# Stats
+total_entries = get_total_entries()
+st.markdown(f"**📊 Database:** {total_entries} entri pengetahuan | **🏛️ Konteks Budaya:** 73% coverage")
 
 # Main Search
+st.markdown("---")
 st.subheader("🔍 Cari Pengetahuan Gayo")
-query = st.text_input(
-    "Masukkan kata dalam Bahasa Indonesia:",
-    placeholder="Contoh: makan, rumah, adat...",
-    key="search_input"
-)
 
-if st.button("🚀 Cari", type="primary") or query:
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    query = st.text_input(
+        "Masukkan kata dalam Bahasa Indonesia:",
+        placeholder="Contoh: makan, rumah, adat, tradisi, alat...",
+        key="search_input"
+    )
+
+with col2:
+    st.markdown("")
+    st.markdown("")
+    search_clicked = st.button("🚀 Cari", type="primary", use_container_width=True)
+
+if search_clicked or query:
     if query and len(query.strip()) >= 2:
-        with st.spinner("Mencari dalam basis pengetahuan..."):
+        with st.spinner("🔍 Mencari dalam basis pengetahuan Gayo..."):
             result = search_gayo_knowledge(query)
             st.markdown(result)
     elif query:
         st.warning("Masukkan minimal 2 karakter")
 
-# Quick tests dengan query yang work
+# Quick tests
 st.markdown("---")
-st.subheader("🎯 Test dengan Kata yang Diketahui")
-col1, col2, col3 = st.columns(3)
+st.subheader("🎯 Quick Tests")
 
-with col1:
-    if st.button("🍚 Test: Titok"):
-        with st.spinner("Testing..."):
-            result = search_gayo_knowledge("Titok")
+test_col1, test_col2, test_col3, test_col4 = st.columns(4)
+
+with test_col1:
+    if st.button("🍚 makan", use_container_width=True):
+        with st.spinner("Mencari..."):
+            result = search_gayo_knowledge("makan")
             st.markdown(result)
 
-with col2:
-    if st.button("🔧 Test: Alat"):
-        with st.spinner("Testing..."):
-            result = search_gayo_knowledge("Alat")
+with test_col2:
+    if st.button("🏠 rumah", use_container_width=True):
+        with st.spinner("Mencari..."):
+            result = search_gayo_knowledge("rumah")
             st.markdown(result)
 
-with col3:
-    if st.button("📖 Test: sirih"):
-        with st.spinner("Testing..."):
+with test_col3:
+    if st.button("🔧 alat", use_container_width=True):
+        with st.spinner("Mencari..."):
+            result = search_gayo_knowledge("alat")
+            st.markdown(result)
+
+with test_col4:
+    if st.button("📖 sirih", use_container_width=True):
+        with st.spinner("Mencari..."):
             result = search_gayo_knowledge("sirih")
             st.markdown(result)
 
-# Show sample data
+# Sample entries preview
 st.markdown("---")
-st.subheader("📋 Sample Data dari Database")
-if st.button("Tampilkan Sample Data"):
+st.subheader("📋 Preview Data")
+
+if st.button("Tampilkan Sample Entries"):
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
@@ -176,7 +209,17 @@ if st.button("Tampilkan Sample Data"):
         data = response.json()
         st.success(f"✅ Menampilkan {len(data)} sample entries:")
         for i, item in enumerate(data, 1):
-            with st.expander(f"Entry {i}: {item.get('metadata', {}).get('gayo_word', 'N/A')}"):
-                st.json(item)
+            metadata = item.get('metadata', {})
+            with st.expander(f"{i}. {metadata.get('gayo_word', 'Unknown')}"):
+                st.write(f"**Text:** {item.get('text', '')}")
+                st.write(f"**Metadata:**")
+                st.json(metadata)
     else:
         st.error(f"❌ Error: {response.status_code}")
+
+# Footer
+st.markdown("---")
+st.markdown(
+    "**ℹ️ AI Assistant untuk melestarikan bahasa dan budaya Gayo Kabupaten Bener Meriah** • "
+    "**Database:** 968 entri • **Konteks Budaya:** 73% coverage"
+)
