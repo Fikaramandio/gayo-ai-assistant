@@ -1,6 +1,6 @@
-# 🤖 AI Assistant Bahasa Gayo - Bener Meriah
+# AI Assistant Bahasa Gayo
 
-AI Assistant untuk pelestarian bahasa dan budaya Gayo Kabupaten Bener Meriah.
+AI Assistant untuk melengkapi kinerja Neniwer Kabupaten Bener Meriah.
 
 ## 🚀 Features
 - Pencarian pengetahuan Bahasa Gayo
